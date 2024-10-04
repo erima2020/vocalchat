@@ -1,4 +1,4 @@
-# Vocal chat
+# Vocal chat with Ollama
 This is a basic webapp allowing two way vocal interactions with a small local large language model. The code was written by OpenAI O1 in iterative steps.
 Large language models are known to have issues such as hallucinations. 
 
