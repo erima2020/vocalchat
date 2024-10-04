@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat with Assistant</title>
+    <style>
+        /* Basic styling for the chat interface */
+        body {font-family: Arial, sans-serif; margin: 20px; font-size: 14px;}
+        .chat-container { max-width: 600px; margin: auto; }
+        .message { padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+        .user { background-color: #d1e7dd; text-align: right; }
+        .assistant { background-color: #f8d7da; text-align: left; }
+        .system { background-color: #e2e3e5; text-align: center; font-style: italic; }
+        form { display: flex; margin-top: 20px; }
+        input[type="text"] { flex: 1; padding: 10px; font-size: 16px; }
+        button { padding: 10px; font-size: 16px; }
+        .audio-container { display: flex; justify-content: space-between; margin-top: 20px; }
+        button.record { padding: 10px; font-size: 16px; }
+        /* Style for code blocks */
+        pre { background-color: #f5f5f5; padding: 10px; overflow: auto; }
+        code { font-family: monospace; }
+    </style>
+    <!-- Include Marked.js for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="chat-container">
+        <h2>Chat with Assistant</h2>
+        <div class="chat-box">
+            {% for message in messages %}
+                <div class="message {{ message.role }}" id="message-{{ loop.index }}" data-content="{{ message.content | e }}"></div>
+            {% endfor %}
+        </div>
+
+        <form method="post" enctype="multipart/form-data">
+            <input type="text" name="message" placeholder="Type your message here..." autofocus>
+            <button type="submit">Send</button>
+        </form>
+
+        <div class="audio-container">
+            <button class="record" id="recordButton">Record</button>
+            <form id="audioForm" method="post" enctype="multipart/form-data" style="display:none;">
+                <input type="file" id="audioInput" name="audio">
+                <button type="submit">Send Audio</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Parse and render Markdown content for each message
+        document.addEventListener('DOMContentLoaded', function() {
+            const messages = document.querySelectorAll('.message');
+            messages.forEach(function(message) {
+                const content = message.getAttribute('data-content');
+                message.innerHTML = marked.parse(content);
+            });
+        });
+
+        // Audio recording functionality
+        const recordButton = document.getElementById('recordButton');
+        const audioInput = document.getElementById('audioInput');
+        const audioForm = document.getElementById('audioForm');
+
+        let mediaRecorder;
+        let audioChunks = [];
+
+        // Function to start recording
+        function startRecording() {
+            navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start();
+
+                mediaRecorder.addEventListener('dataavailable', event => {
+                    audioChunks.push(event.data);
+                });
+
+                mediaRecorder.addEventListener('stop', () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const audioFile = new File([audioBlob], 'recording.wav', { type: 'audio/wav' });
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(audioFile);
+                    audioInput.files = dataTransfer.files;
+                    audioForm.style.display = 'block';
+                });
+            });
+        }
+
+        // Event listener for the record button
+        recordButton.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                recordButton.textContent = 'Record';
+            } else {
+                audioChunks = [];
+                startRecording();
+                recordButton.textContent = 'Stop';
+            }
+        });
+    </script>
+</body>
+</html>
