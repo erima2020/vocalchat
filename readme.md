@@ -1,12 +1,19 @@
 # Vocal chat
 This is a basic webapp allowing two way vocal interactions with a small local large language model. The code was written by OpenAI O1 in iterative steps.
 Large language models are known to have issues such as hallucinations. 
+
 Accuracy and Reliability: While the model strives to provide accurate and helpful information, it may generate incorrect or misleading responses. Users should verify information from reliable sources before acting upon it.
+
 No Professional Advice: This webapp does not offer professional advice (medical, legal, financial, etc.). For such matters, please consult a qualified professional.
+
 Privacy and Data Security: Be mindful of the information you share during interactions. Although the model operates locally, ensure that your device is secure to protect your privacy.
+
 Content Responsibility: Users are responsible for the content they input and the use of the generated responses. The developers are not liable for any misuse or consequences arising from the use of this webapp.
+
 Updates and Maintenance: The webapp and the underlying model may receive updates to improve performance and security. However, no guarantees are made regarding uninterrupted access or error-free operation.
+
 Limitation of Liability: In no event shall the developers or affiliates be liable for any direct, indirect, incidental, special, or consequential damages arising out of the use or inability to use this webapp.
+
 By using this webapp, you acknowledge that you have read, understood, and agree to abide by this disclaimer. If you do not agree with any part of this disclaimer, please refrain from using the webapp. 
 
 # Setup Guide
