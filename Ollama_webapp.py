@@ -7,6 +7,7 @@ import ssl
 import wave
 import sys
 import uuid
+import threading
 
 # SSL context adjustments (if needed)
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -168,37 +169,18 @@ def transcribe_with_whisper_cpp(filepath):
             print(f"Cleaned up transcription file '{transcription_file}'")
 
 def get_completion(messages):
-    response = client.chat.completions.create(
-        model="llama3.2:1b",
-        messages=messages
-    )
-    return response.choices[0].message.content
-
-def text_to_speech(text, filename, play_audio=True):
-    """
-    Converts text to speech, plays it on the server (if play_audio is True), and saves it as an AIFF file.
-    """
-    aiff_path = os.path.join(app.config['UPLOAD_FOLDER'], filename + '.aiff')
-    command = ['say', '-o', aiff_path, text]
-    print(f"Converting text to speech and saving to '{aiff_path}'...")
-    try:
-        # Generate AIFF using 'say'
-        subprocess.run(command, check=True)
-        print("Text-to-speech conversion to AIFF successful.")
-
-        if play_audio:
-            # Play the audio on the server
-            play_command = ['afplay', aiff_path]
-            subprocess.run(play_command, check=True)
-            print(f"Played audio '{aiff_path}' on the server.")
-
-        return aiff_path
-    except subprocess.CalledProcessError as e:
-        print(f"Error: Text-to-speech conversion or playback failed: {e}", file=sys.stderr)
-        return None
+        response = client.chat.completions.create(
+            model="llama3.2:1b",
+            messages=messages
+        )
+        return response.choices[0].message.content
 
 def get_word_count(text):
     return len(text.split())
+
+def play_audio_file(aiff_path):
+    play_command = ['afplay', aiff_path]
+    subprocess.run(play_command)
 
 @app.before_request
 def initialize_session():
@@ -335,7 +317,10 @@ def chat():
                     # Convert assistant's response to speech
                     unique_id = str(uuid.uuid4())
                     audio_filename = f"response_{unique_id}"
+                    
+                    # Assuming text_to_speech uses the 'say' command and plays audio asynchronously
                     audio_path = text_to_speech(assistant_response, audio_filename, play_audio=play_audio)
+                    
                     if audio_path:
                         # Store the audio file name for download
                         message_entry['audio_file'] = os.path.basename(audio_path)
@@ -361,7 +346,10 @@ def chat():
                 # Convert assistant's response to speech
                 unique_id = str(uuid.uuid4())
                 audio_filename = f"response_{unique_id}"
+                
+                # Assuming text_to_speech uses the 'say' command and plays audio asynchronously
                 audio_path = text_to_speech(assistant_response, audio_filename, play_audio=play_audio)
+                
                 if audio_path:
                     # Store the audio file name for download
                     message_entry['audio_file'] = os.path.basename(audio_path)
