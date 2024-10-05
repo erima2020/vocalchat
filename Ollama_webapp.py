@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, redirect, url_for, send_from_directory, session
 import os
 import subprocess
 from werkzeug.utils import secure_filename
@@ -6,22 +6,21 @@ from openai import OpenAI
 import ssl
 import wave
 import sys
+import uuid
 
 # SSL context adjustments (if needed)
 ssl._create_default_https_context = ssl._create_unverified_context
 app = Flask(__name__)
+app.secret_key = 'your_secret_key'  # Replace with your actual secret key
 
 client = OpenAI(
     base_url='http://localhost:11434/v1',
-    api_key='ollama',  # required, but unused
+    api_key='ollama',  # Replace with your actual API key if required
 )
 
 # Define folder to store uploaded audio files
-
 home_dir = os.path.expanduser("~")
-os.path.join(home_dir,"Downloads","uploads")
-
-UPLOAD_FOLDER = os.path.join(home_dir,"Downloads","uploads")  # Update to your desired path
+UPLOAD_FOLDER = os.path.join(home_dir, "Downloads", "uploads")  # Update to your desired path
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -175,17 +174,82 @@ def get_completion(messages):
     )
     return response.choices[0].message.content
 
-def text_to_speech(text):
-    # Use the macOS 'say' command to convert text to speech
-    subprocess.run(['say', text])
+def text_to_speech(text, filename, play_audio=True):
+    """
+    Converts text to speech, plays it on the server (if play_audio is True), and saves it as an AIFF file.
+    """
+    aiff_path = os.path.join(app.config['UPLOAD_FOLDER'], filename + '.aiff')
+    command = ['say', '-o', aiff_path, text]
+    print(f"Converting text to speech and saving to '{aiff_path}'...")
+    try:
+        # Generate AIFF using 'say'
+        subprocess.run(command, check=True)
+        print("Text-to-speech conversion to AIFF successful.")
 
-# Use a global variable to store messages
-messages = [
-    {"role": "system", "content": "You are a helpful assistant. Write short responses of 3 sentences or less."}
-]
+        if play_audio:
+            # Play the audio on the server
+            play_command = ['afplay', aiff_path]
+            subprocess.run(play_command, check=True)
+            print(f"Played audio '{aiff_path}' on the server.")
 
-@app.route('/', methods=['GET', 'POST'])
+        return aiff_path
+    except subprocess.CalledProcessError as e:
+        print(f"Error: Text-to-speech conversion or playback failed: {e}", file=sys.stderr)
+        return None
+
+def get_word_count(text):
+    return len(text.split())
+
+@app.before_request
+def initialize_session():
+    if 'messages' not in session:
+        session['messages'] = [
+            {"role": "system", "content": session.get('system_prompt', "You are a helpful assistant. Write short responses of 3 sentences or less.")}
+        ]
+
+@app.route('/', methods=['GET'])
+def index():
+    return redirect(url_for('settings'))
+
+@app.route('/settings', methods=['GET', 'POST'])
+def settings():
+    if request.method == 'POST':
+        # Save settings to session
+        session['play_audio'] = request.form.get('play_audio') == 'on'
+        session['story_mode'] = request.form.get('story_mode') == 'on'
+        session['story_duration'] = int(request.form.get('story_duration', '0'))
+        session['system_prompt'] = request.form.get('system_prompt', 'You are a helpful assistant. Write short responses of 3 sentences or less.')
+        # Reset messages with new system prompt
+        session['messages'] = [
+            {"role": "system", "content": session['system_prompt']}
+        ]
+        return redirect(url_for('chat'))
+
+    # Set default values if they are not in session
+    if 'play_audio' not in session:
+        session['play_audio'] = True
+    if 'story_mode' not in session:
+        session['story_mode'] = False
+    if 'story_duration' not in session:
+        session['story_duration'] = 0
+    if 'system_prompt' not in session:
+        session['system_prompt'] = "You are a helpful assistant. Write short responses of 3 sentences or less."
+
+    return render_template('settings.html', 
+                           play_audio=session['play_audio'], 
+                           story_mode=session['story_mode'],
+                           story_duration=session['story_duration'],
+                           system_prompt=session['system_prompt'])
+
+@app.route('/chat', methods=['GET', 'POST'])
 def chat():
+    if 'messages' not in session:
+        session['messages'] = [
+            {"role": "system", "content": session.get('system_prompt', "You are a helpful assistant. Write short responses of 3 sentences or less.")}
+        ]
+
+    messages = session['messages']
+
     if request.method == 'POST':
         # Initialize user_input
         user_input = ""
@@ -237,22 +301,96 @@ def chat():
                     user_input = "Sorry, there was an error processing your audio file."
         else:
             # Handle text input
-            user_input = request.form.get('message', '')
+            user_input = request.form.get('message', '').strip()
 
         if user_input:
-            # Append user's message to messages
-            messages.append({"role": "user", "content": user_input})
+            play_audio = session.get('play_audio', True)
+            story_mode = session.get('story_mode', False)
+            story_duration_minutes = session.get('story_duration', 0)
+            system_prompt = session.get('system_prompt', "You are a helpful assistant. Write short responses of 3 sentences or less.")
 
-            # Get assistant response
-            assistant_response = get_completion(messages)
-            messages.append({"role": "assistant", "content": assistant_response})
+            if story_mode and story_duration_minutes > 0:
+                # Bedtime story mode with iterative generation
+                words_per_minute = 150  # Average speaking rate
+                target_word_count = story_duration_minutes * words_per_minute
+                total_word_count = 0
 
-            # Convert assistant's response to speech
-            text_to_speech(assistant_response)
+                # Initialize story_messages for the conversation
+                story_messages = [
+                    {"role": "system", "content": f"{system_prompt}."}
+                ]
+                story_messages.append({"role": "user", "content": user_input})
+
+                # Append the initial user message to the main messages
+                messages.append({"role": "user", "content": user_input})
+
+                while total_word_count < target_word_count:
+                    # Get assistant response
+                    assistant_response = get_completion(story_messages)
+
+                    # Calculate word count
+                    response_word_count = get_word_count(assistant_response)
+                    total_word_count += response_word_count
+
+                    # Append assistant's response to messages
+                    message_entry = {"role": "assistant", "content": assistant_response}
+
+                    # Convert assistant's response to speech
+                    unique_id = str(uuid.uuid4())
+                    audio_filename = f"response_{unique_id}"
+                    audio_path = text_to_speech(assistant_response, audio_filename, play_audio=play_audio)
+                    if audio_path:
+                        # Store the audio file name for download
+                        message_entry['audio_file'] = os.path.basename(audio_path)
+
+                    messages.append(message_entry)
+                    story_messages.append({"role": "assistant", "content": assistant_response})
+
+                    # Prompt the assistant to continue
+                    story_messages.append({"role": "user", "content": "Please continue."})
+
+                # Update session messages
+                session['messages'] = messages
+
+            else:
+                # Normal chat mode
+                # Append user's message to messages
+                messages.append({"role": "user", "content": user_input})
+
+                # Get assistant response
+                assistant_response = get_completion(messages)
+
+                # Append assistant's response to messages
+                message_entry = {"role": "assistant", "content": assistant_response}
+
+                # Convert assistant's response to speech
+                unique_id = str(uuid.uuid4())
+                audio_filename = f"response_{unique_id}"
+                audio_path = text_to_speech(assistant_response, audio_filename, play_audio=play_audio)
+                if audio_path:
+                    # Store the audio file name for download
+                    message_entry['audio_file'] = os.path.basename(audio_path)
+
+                messages.append(message_entry)
+
+                # Update session messages
+                session['messages'] = messages
 
         return redirect(url_for('chat'))
 
-    return render_template('chat.html', messages=messages)
+    return render_template('chat.html', messages=session['messages'])
+
+@app.route('/download/<filename>')
+def download_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
+
+@app.route('/reset', methods=['POST'])
+def reset_conversation():
+    # Reset messages with current system prompt
+    session['messages'] = [
+        {"role": "system", "content": session.get('system_prompt', "You are a helpful assistant. Write short responses of 3 sentences or less.")}
+    ]
+    return redirect(url_for('chat'))
 
 if __name__ == '__main__':
     app.run(debug=True)
