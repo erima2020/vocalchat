@@ -309,20 +309,17 @@ def chat():
             story_duration_minutes = session.get('story_duration', 0)
             system_prompt = session.get('system_prompt', "You are a helpful assistant. Write short responses of 3 sentences or less.")
 
+            # Append user's message to messages
+            messages.append({"role": "user", "content": user_input})
+
             if story_mode and story_duration_minutes > 0:
                 # Bedtime story mode with iterative generation
                 words_per_minute = 150  # Average speaking rate
                 target_word_count = story_duration_minutes * words_per_minute
                 total_word_count = 0
 
-                # Initialize story_messages for the conversation
-                story_messages = [
-                    {"role": "system", "content": f"{system_prompt}."}
-                ]
-                story_messages.append({"role": "user", "content": user_input})
-
-                # Append the initial user message to the main messages
-                messages.append({"role": "user", "content": user_input})
+                # Use existing conversation history
+                story_messages = messages.copy()
 
                 while total_word_count < target_word_count:
                     # Get assistant response
@@ -344,7 +341,7 @@ def chat():
                         message_entry['audio_file'] = os.path.basename(audio_path)
 
                     messages.append(message_entry)
-                    story_messages.append({"role": "assistant", "content": assistant_response})
+                    story_messages.append(message_entry)
 
                     # Prompt the assistant to continue
                     story_messages.append({"role": "user", "content": "Please continue."})
@@ -354,8 +351,6 @@ def chat():
 
             else:
                 # Normal chat mode
-                # Append user's message to messages
-                messages.append({"role": "user", "content": user_input})
 
                 # Get assistant response
                 assistant_response = get_completion(messages)
