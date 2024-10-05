@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Settings - Chat Assistant</title>
+    <style>
+        /* Basic styling for the settings interface */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            font-size: 14px;
+            background-color: #f0f2f5;
+        }
+        .settings-container {
+            max-width: 600px;
+            margin: auto;
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .settings-container h2 {
+            margin-bottom: 20px;
+        }
+        .settings-container label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .settings-container input[type="text"],
+        .settings-container textarea {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .settings-container input[type="number"] {
+            width: 100px;
+            padding: 10px;
+            font-size: 16px;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            margin-left: 10px;
+        }
+        .settings-container input[type="checkbox"] {
+            margin-right: 10px;
+        }
+        .settings-container button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            background-color: #28a745;
+            color: #ffffff;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .settings-container button:hover {
+            background-color: #218838;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .story-duration {
+            display: flex;
+            align-items: center;
+            margin-left: 25px;
+        }
+        .note {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: -15px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="settings-container">
+        <h2>Settings</h2>
+        <form method="post" action="{{ url_for('settings') }}">
+            <label>
+                <input type="checkbox" name="play_audio" {% if play_audio %}checked{% endif %}>
+                Play Output Audio
+            </label>
+
+            <div class="checkbox-group">
+                <label>
+                    <input type="checkbox" name="story_mode" id="storyModeCheckbox" {% if story_mode %}checked{% endif %}>
+                    Enable Bedtime Story Mode
+                </label>
+                <div class="story-duration" id="storyDurationDiv" {% if not story_mode %}style="display: none;"{% endif %}>
+                    <label for="storyDuration">Story Duration (minutes):</label>
+                    <input type="number" name="story_duration" id="storyDuration" min="0" value="{{ story_duration }}">
+                </div>
+            </div>
+
+            <label for="systemPrompt">System Prompt:</label>
+            <textarea name="system_prompt" id="systemPrompt" rows="4">{{ system_prompt }}</textarea>
+            <div class="note">Customize the assistant's behavior by changing the system prompt.</div>
+
+            <button type="submit">Save Settings</button>
+        </form>
+    </div>
+
+    <script>
+        // Show/hide story duration input based on story mode checkbox
+        document.getElementById('storyModeCheckbox').addEventListener('change', function() {
+            const storyDurationDiv = document.getElementById('storyDurationDiv');
+            if (this.checked) {
+                storyDurationDiv.style.display = 'flex';
+            } else {
+                storyDurationDiv.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
