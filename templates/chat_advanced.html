@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat with Assistant</title>
+    <style>
+        /* Basic styling for the chat interface */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            font-size: 14px;
+            background-color: #f0f2f5;
+        }
+        .chat-container {
+            max-width: 800px;
+            margin: auto;
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .chat-box {
+            max-height: 500px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        .message {
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-radius: 15px;
+            position: relative;
+            max-width: 70%;
+            word-wrap: break-word;
+        }
+        .user {
+            background-color: #d1e7dd;
+            align-self: flex-end;
+            margin-left: auto;
+            text-align: right;
+        }
+        .assistant {
+            background-color: #f8d7da;
+            align-self: flex-start;
+            margin-right: auto;
+            text-align: left;
+        }
+        .system {
+            background-color: #e2e3e5;
+            align-self: center;
+            text-align: center;
+            font-style: italic;
+            max-width: 90%;
+            margin: 10px auto;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+        .input-group {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            font-size: 16px;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+        }
+        button.send-btn {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-left: 10px;
+            border: none;
+            background-color: #007bff;
+            color: #ffffff;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button.send-btn:hover {
+            background-color: #0056b3;
+        }
+        .audio-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        button.record {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            background-color: #28a745;
+            color: #ffffff;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button.record.recording {
+            background-color: #dc3545;
+        }
+        button.record:hover {
+            opacity: 0.9;
+        }
+        form#audioForm {
+            display: none;
+            margin-left: 10px;
+        }
+        form#audioForm button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            background-color: #17a2b8;
+            color: #ffffff;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        form#audioForm button:hover {
+            background-color: #117a8b;
+        }
+        .controls {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .controls form {
+            display: inline;
+            margin-right: 10px;
+        }
+        .controls button.reset-btn {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            background-color: #ffc107;
+            color: #212529;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .controls button.reset-btn:hover {
+            background-color: #e0a800;
+        }
+        .controls button.export-btn {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            background-color: #17a2b8;
+            color: #ffffff;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .controls button.export-btn:hover {
+            background-color: #117a8b;
+        }
+        .download-link {
+            margin-top: 5px;
+        }
+        .download-link a {
+            text-decoration: none;
+            color: #007bff;
+        }
+        .download-link a:hover {
+            text-decoration: underline;
+        }
+        .flash-message {
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+    </style>
+    <!-- Include Marked.js for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="chat-container">
+        <h2>Chat with Assistant</h2>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="flash-message">
+              {% for message in messages %}
+                <p>{{ message }}</p>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <!-- Chat Messages -->
+        <div class="chat-box" id="chatBox">
+            {% for message in messages %}
+                <div class="message {{ message.role }}" id="message-{{ loop.index }}" data-content="{{ message.content | e }}">
+                    {% if message.role == 'assistant' and message.audio_file %}
+                        <div class="download-link">
+                            <a href="{{ url_for('download_file', filename=message.audio_file) }}" download>Download Audio</a>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <form method="post" action="{{ url_for('reset_conversation') }}">
+                <button type="submit" class="reset-btn">Reset Conversation</button>
+            </form>
+            <form method="post" action="{{ url_for('export_conversation') }}">
+                <button type="submit" class="export-btn">Export Conversation</button>
+            </form>
+        </div>
+
+        <!-- Audio Recording Functionality -->
+        <div class="audio-container">
+            <button class="record" id="recordButton">Record</button>
+            <form id="audioForm" method="post" enctype="multipart/form-data">
+                <input type="file" id="audioInput" name="audio">
+                <button type="submit">Send Audio</button>
+            </form>
+        </div>
+
+        <!-- Message Input Form -->
+        <form method="post" enctype="multipart/form-data">
+            <div class="input-group">
+                <input type="text" name="message" placeholder="Type your message here..." autofocus>
+                <button type="submit" class="send-btn">Send</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // Scroll chat box to the bottom on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatBox = document.getElementById('chatBox');
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            const messages = document.querySelectorAll('.message');
+            messages.forEach(function(message) {
+                const content = message.getAttribute('data-content');
+                message.innerHTML = marked.parse(content) + message.innerHTML;
+            });
+        });
+
+        // Audio recording functionality
+        const recordButton = document.getElementById('recordButton');
+        const audioInput = document.getElementById('audioInput');
+        const audioForm = document.getElementById('audioForm');
+
+        let mediaRecorder;
+        let audioChunks = [];
+
+        // Function to start recording
+        function startRecording() {
+            navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start();
+                recordButton.classList.add('recording');
+                recordButton.textContent = 'Stop';
+
+                mediaRecorder.addEventListener('dataavailable', event => {
+                    audioChunks.push(event.data);
+                });
+
+                mediaRecorder.addEventListener('stop', () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const audioFile = new File([audioBlob], 'recording.wav', { type: 'audio/wav' });
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(audioFile);
+                    audioInput.files = dataTransfer.files;
+                    audioForm.style.display = 'flex';
+                    audioChunks = [];
+                });
+            }).catch(error => {
+                console.error("Error accessing microphone:", error);
+                alert("Could not access your microphone. Please check permissions.");
+            });
+        }
+
+        // Event listener for the record button
+        recordButton.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                recordButton.classList.remove('recording');
+                recordButton.textContent = 'Record';
+            } else {
+                startRecording();
+            }
+        });
+    </script>
+</body>
+</html>
