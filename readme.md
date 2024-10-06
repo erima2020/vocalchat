@@ -17,7 +17,8 @@ Limitation of Liability: In no event shall the developers or affiliates be liabl
 By using this webapp, you acknowledge that you have read, understood, and agree to abide by this disclaimer. If you do not agree with any part of this disclaimer, please refrain from using the webapp. 
 
 # Changes log
-October 5 2024. Added a more advanced version with more options including the export of the complete conversation.
+October 6 2024. Added a more advanced version with more options including the export of the complete conversation.
+
 October 5 2024. Added customizable settings including the bedtime story mode.
 
 # Setup Guide
